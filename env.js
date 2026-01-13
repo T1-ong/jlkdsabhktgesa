@@ -173,6 +173,74 @@ function isAccountInRange(account, validRanges) {
   return false;
 }
 
+// 解析AI评论参数环境变量
+const parseAICommentsEnv = () => {
+  // 默认值，与my_config.js中的默认配置保持一致
+  const defaultAICommentsParm = {
+    url: 'https://api.siliconflow.cn/v1/chat/completions',
+    body: {
+      'model': 'deepseek-ai/DeepSeek-R1-0528-Qwen3-8B',
+      'max_tokens': 25,
+      'min_p': 0.06,
+      'temperature': 0.6,
+      'top_p': 0.6,
+      'top_k': 50,
+      'frequency_penalty': 0.7,
+      'n': 1,
+      'enable_thinking': false,
+      'thinking_budget': 4096,
+    },
+    prompt: '以老二次元第一视角真实表达自然融入B站表情15字内，不要带引号结尾不要带符号，只需要返回一条纯文本评论即可'
+  };
+
+  // 解析单一的AIpeizhi环境变量
+  const parseAIpeizhiEnv = () => {
+    const aipeizhiEnv = process.env.AIpeizhi || '';
+    const aipeizhiConfig = {};
+
+    if (aipeizhiEnv) {
+      // 按换行符分割每一行
+      const lines = aipeizhiEnv.split(/\r?\n/).filter(line => line.trim() !== '');
+      
+      // 解析每一行的键值对
+      lines.forEach(line => {
+        // 按冒号分割键和值
+        const [key, ...values] = line.split(':');
+        if (key) {
+          const trimmedKey = key.trim();
+          const trimmedValue = values.join(':').trim();
+          if (trimmedKey && trimmedValue) {
+            aipeizhiConfig[trimmedKey] = trimmedValue;
+          }
+        }
+      });
+    }
+
+    return aipeizhiConfig;
+  };
+
+  // 获取AIpeizhi环境变量中的配置
+  const aipeizhiConfig = parseAIpeizhiEnv();
+
+  // 解析环境变量，优先级：AIpeizhi环境变量 > 默认值
+  return {
+    url: aipeizhiConfig.AI_API_URL || defaultAICommentsParm.url,
+    body: {
+      'model': aipeizhiConfig.AI_MODEL || defaultAICommentsParm.body.model,
+      'max_tokens': parseInt(aipeizhiConfig.AI_MAX_TOKENS) || defaultAICommentsParm.body.max_tokens,
+      'min_p': parseFloat(aipeizhiConfig.AI_MIN_P) || defaultAICommentsParm.body.min_p,
+      'temperature': parseFloat(aipeizhiConfig.AI_TEMPERATURE) || defaultAICommentsParm.body.temperature,
+      'top_p': parseFloat(aipeizhiConfig.AI_TOP_P) || defaultAICommentsParm.body.top_p,
+      'top_k': parseInt(aipeizhiConfig.AI_TOP_K) || defaultAICommentsParm.body.top_k,
+      'frequency_penalty': parseFloat(aipeizhiConfig.AI_FREQUENCY_PENALTY) || defaultAICommentsParm.body.frequency_penalty,
+      'n': parseInt(aipeizhiConfig.AI_N) || defaultAICommentsParm.body.n,
+      'enable_thinking': aipeizhiConfig.AI_ENABLE_THINKING === 'true' || defaultAICommentsParm.body.enable_thinking,
+      'thinking_budget': parseInt(aipeizhiConfig.AI_THINKING_BUDGET) || defaultAICommentsParm.body.thinking_budget,
+    },
+    prompt: aipeizhiConfig.AI_PROMPT || defaultAICommentsParm.prompt
+  };
+};
+
 // 解析后的备注映射
 const noteMap = parseBiliNote(bilinoteEnv);
 
@@ -184,6 +252,9 @@ const accountRange = parseAccountRange(accountRangeEnv, allAccounts.length);
 const parsedAccounts = accountRange 
   ? allAccounts.filter(account => isAccountInRange(account, accountRange))
   : allAccounts;
+
+// 解析后的AI评论参数
+const parsedAICommentsParm = parseAICommentsEnv();
 
 
 module.exports = Object.freeze({
@@ -278,5 +349,11 @@ module.exports = Object.freeze({
     ai_parm: {
         //apikey
         AI_API_KEY: 'sk-uelygppmguihuxxvsrosqjwnsprtcrtccgntkzmzuvaugjgf',
-    }
+    },
+    
+    /**
+     * AI评论参数
+     * 从环境变量解析，优先级高于my_config.js中的默认配置
+     */
+    ai_comments_parm: parsedAICommentsParm
 });
