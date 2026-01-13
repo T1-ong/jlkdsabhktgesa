@@ -1,3 +1,5 @@
+const env = require('./env.js');
+
 module.exports = Object.freeze({
     /** 
      * 默认设置(公用)
@@ -19,8 +21,7 @@ module.exports = Object.freeze({
          */
         Articles: [
             '临期速看',
-            '精选大奖版',
-            '抽奖情报合集'
+            '精选大奖版'
         ],
 
         /**
@@ -283,7 +284,7 @@ module.exports = Object.freeze({
         /**
          * - 结束运行时发送随机动态的数量
          */
-        create_dy_num: 12,
+        create_dy_num: 8,
 
         /**
          * - 随机动态内容
@@ -348,20 +349,7 @@ module.exports = Object.freeze({
          * 默认为硅基流动，可以修改为其他AI服务
          * 所有账号都会使用此AI配置
          */
-        ai_comments_parm: {
-            url: 'https://api.siliconflow.cn/v1/chat/completions',
-            body: {
-                'model': 'deepseek-ai/DeepSeek-R1-0528-Qwen3-8B',
-                'max_tokens': 25,
-                'min_p': 0.06,
-                'temperature': 0.6,
-                'top_p': 0.6,
-                'top_k': 50,
-                'frequency_penalty': 0.7,
-                'n': 1,
-            },
-            prompt: '以老二次元第一视角真实表达自然融入B站表情15字内，不要带引号结尾不要带符号，只需要返回一条纯文本评论即可'
-        },
+        ai_comments_parm: env.ai_comments_parm,
 
         /**
          * 是否抄热评
