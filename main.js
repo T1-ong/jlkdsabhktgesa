@@ -196,6 +196,46 @@ function initConfig() {
 
     if (initEnv() || initConfig()) return;
 
+    // 根据时间自动更新关键词
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, 'my_config.js');
+    
+    const now = new Date();
+    const hour = now.getHours();
+    
+    let keywords = [];
+    let updateKeywords = false;
+    
+    if (hour < 12) {
+        // 中午12点前：使用"抽奖合集史上最好"
+        keywords = ['抽奖合集史上最好'];
+        log.info('关键词更新', '已设置中午12点前关键词：抽奖合集史上最好');
+        updateKeywords = true;
+    } else {
+        // 中午12点后：使用默认关键词
+        keywords = ['临期速看', '精选大奖版'];
+        log.info('关键词更新', '已设置中午12点后关键词：临期速看, 精选大奖版');
+        updateKeywords = true;
+    }
+    
+    if (updateKeywords) {
+        // 读取配置文件
+        let content = fs.readFileSync(configPath, 'utf8');
+        
+        // 替换关键词
+        const keywordRegex = /Articles: \[(?:\s*'[^']*',?\s*)*\]/g;
+        const keywordStr = `Articles: [
+            '${keywords.join("',\n            '")}'
+        ]`;
+        
+        content = content.replace(keywordRegex, keywordStr);
+        
+        // 写入配置文件
+        fs.writeFileSync(configPath, content, 'utf8');
+        log.info('关键词更新', '配置文件已更新');
+    }
+
     /**OPTIONS */
     process.env.lottery_mode = process.argv[2];
 
