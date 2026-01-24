@@ -205,22 +205,35 @@ function initConfig() {
     const hour = now.getHours();
     
     let keywords = [];
+    let articleCreateTime = null;
     let updateKeywords = false;
     
+    // 读取配置文件获取原始的article_create_time值
+    let originalArticleCreateTime = null;
+    const content = fs.readFileSync(configPath, 'utf8');
+    const articleTimeMatch = content.match(/article_create_time:\s*(\d+),/);
+    if (articleTimeMatch) {
+        originalArticleCreateTime = parseInt(articleTimeMatch[1]);
+    }
+    
     if (hour < 12) {
-        // 中午12点前：使用"抽奖合集史上最好"
+        // 中午12点前：使用"抽奖合集史上最好"，只检查昨天一天的专栏
         keywords = ['抽奖合集史上最好'];
+        articleCreateTime = 1;
         log.info('关键词更新', '已设置中午12点前关键词：抽奖合集史上最好');
+        log.info('专栏时间', '已设置专栏检查天数：1天（仅昨天）');
         updateKeywords = true;
     } else {
-        // 中午12点后：使用默认关键词
+        // 中午12点后：使用默认关键词，恢复配置文件的article_create_time
         keywords = ['临期速看', '精选大奖版'];
+        articleCreateTime = originalArticleCreateTime;
         log.info('关键词更新', '已设置中午12点后关键词：临期速看, 精选大奖版');
+        log.info('专栏时间', `已恢复配置文件的专栏检查天数：${originalArticleCreateTime}天`);
         updateKeywords = true;
     }
     
     if (updateKeywords) {
-        // 读取配置文件
+        // 重新读取配置文件（因为可能在前面已经读取过）
         let content = fs.readFileSync(configPath, 'utf8');
         
         // 替换关键词
@@ -230,6 +243,12 @@ function initConfig() {
         ]`;
         
         content = content.replace(keywordRegex, keywordStr);
+        
+        // 根据时间设置article_create_time
+        if (articleCreateTime !== null) {
+            const articleTimeRegex = /article_create_time:\s*\d+,/;
+            content = content.replace(articleTimeRegex, `article_create_time: ${articleCreateTime},`);
+        }
         
         // 写入配置文件
         fs.writeFileSync(configPath, content, 'utf8');
