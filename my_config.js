@@ -181,7 +181,7 @@ module.exports = Object.freeze({
         /**
          * - 专栏创建时间距离现在的最大天数
          */
-        article_create_time: 2,
+        article_create_time: 3,
 
         /**
          * - 不检查专栏是否看过，若选择检查可以提高检测效率
