@@ -10,6 +10,7 @@ const {
 } = require('./lib/utils');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const request = require('https');
+const { sendNotify } = require('./lib/helper/notify');
 const metainfo = [
     '  _           _   _                   _____           _       _   ',
     ' | |         | | | |                 / ____|         (_)     | |  ',
@@ -43,12 +44,16 @@ async function main() {
         process.env.ENABLE_MULTIPLE_ACCOUNT = '';
         let localhost = request.globalAgent;
 
+        let failedAccounts = [];
+
         for (const acco of muti_acco) {
             process.env.COOKIE = acco.COOKIE;
             process.env.NUMBER = acco.NUMBER;
             process.env.CLEAR = acco.CLEAR;
             process.env.NOTE = acco.NOTE;
             process.env.ACCOUNT_UA = acco.ACCOUNT_UA;
+            process.env.ARTICLE_FAILED = 'false';
+            
             if (acco.PROXY_HOST) {
                 printIpInfo(true);
                 //http://ip:port
@@ -63,6 +68,12 @@ async function main() {
                 request.globalAgent = localhost;
             }
             const err_msg = await main();
+            
+            if (process.env.ARTICLE_FAILED === 'true') {
+                failedAccounts.push(acco);
+                log.info('main', `账号${acco.NUMBER}读取专栏失败，将在第一轮运行完后重新运行`);
+            }
+            
             if (err_msg) {
                 return err_msg;
             } else {
@@ -74,6 +85,55 @@ async function main() {
             }
             request.globalAgent = localhost;
         }
+
+        if (failedAccounts.length > 0) {
+            log.info('main', `第一轮运行完成，开始重新运行失败的账号(${failedAccounts.length}个)`);
+            for (const acco of failedAccounts) {
+                process.env.COOKIE = acco.COOKIE;
+                process.env.NUMBER = acco.NUMBER;
+                process.env.CLEAR = acco.CLEAR;
+                process.env.NOTE = acco.NOTE;
+                process.env.ACCOUNT_UA = acco.ACCOUNT_UA;
+                process.env.ARTICLE_FAILED = 'false';
+                
+                if (acco.PROXY_HOST) {
+                    printIpInfo(true);
+                    const proxyUrl = acco.PROXY_USER
+                        ? 'http://' + acco.PROXY_USER + ':' + acco.PROXY_PASS + '@' + acco.PROXY_HOST + ':' + acco.PROXY_PORT
+                        : 'http://' + acco.PROXY_HOST + ':' + acco.PROXY_PORT;
+                    request.globalAgent = new HttpsProxyAgent(proxyUrl);
+                    printIpInfo(false);
+                }else {
+                    request.globalAgent = localhost;
+                }
+                
+                log.info('main', `重新运行账号${acco.NUMBER}`);
+                const err_msg = await main();
+                
+                if (process.env.ARTICLE_FAILED === 'true') {
+                    const accountName = acco.NOTE || `账号${acco.NUMBER}`;
+                    log.warn('main', `${accountName}重新运行后仍然读取专栏失败`);
+                    let message = `${accountName}重新运行后仍然读取专栏失败`;
+                    message += `\n请更新cookie`;
+                    await sendNotify(
+                        `专栏读取失败`,
+                        message
+                    );
+                }
+                
+                if (err_msg) {
+                    return err_msg;
+                } else {
+                    if (ck_flag === 1) {
+                        await delay(acco.WAIT);
+                    } else {
+                        await delay(3 * 1000);
+                    }
+                }
+                request.globalAgent = localhost;
+            }
+        }
+        
         /**多账号状态还原 */
         process.env.ENABLE_MULTIPLE_ACCOUNT = ENABLE_MULTIPLE_ACCOUNT;
     } else if (COOKIE) {
