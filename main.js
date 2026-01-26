@@ -88,6 +88,9 @@ async function main() {
 
         if (failedAccounts.length > 0) {
             log.info('main', `第一轮运行完成，开始重新运行失败的账号(${failedAccounts.length}个)`);
+            log.info('main', `等待15分钟后重新运行失败账号...`);
+            await delay(15 * 60 * 1000);
+            
             for (const acco of failedAccounts) {
                 process.env.COOKIE = acco.COOKIE;
                 process.env.NUMBER = acco.NUMBER;
