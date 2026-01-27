@@ -111,17 +111,30 @@ async function main() {
                 }
                 
                 log.info('main', `重新运行账号${acco.NUMBER}`);
+                log.info('main', `重新运行前ARTICLE_FAILED状态: ${process.env.ARTICLE_FAILED}`);
                 const err_msg = await main();
+                log.info('main', `重新运行后ARTICLE_FAILED状态: ${process.env.ARTICLE_FAILED}`);
                 
+                log.info('main', `检查ARTICLE_FAILED状态: ${process.env.ARTICLE_FAILED}`);
                 if (process.env.ARTICLE_FAILED === 'true') {
+                    log.info('main', `进入通知发送逻辑`);
                     const accountName = acco.NOTE || `账号${acco.NUMBER}`;
                     log.warn('main', `${accountName}重新运行后仍然读取专栏失败`);
                     let message = `${accountName}重新运行后仍然读取专栏失败`;
                     message += `\n请更新cookie`;
-                    await sendNotify(
-                        `专栏读取失败`,
-                        message
-                    );
+                    log.info('main', `准备发送通知: ${message}`);
+                    try {
+                        await sendNotify(
+                            `专栏读取失败`,
+                            message
+                        );
+                        log.info('main', `通知发送完成`);
+                    } catch (error) {
+                        log.error('main', `通知发送失败: ${error.message}`);
+                        log.error('main', `错误堆栈: ${error.stack}`);
+                    }
+                } else {
+                    log.info('main', `账号${acco.NUMBER}重新运行成功，无需发送通知`);
                 }
                 
                 if (err_msg) {
