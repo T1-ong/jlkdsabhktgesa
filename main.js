@@ -156,7 +156,7 @@ async function main() {
                     try {
                         await sendNotify(
                             `${accountName}读取不到专栏`,
-                            `第二次运行了，为什么还不更新cookie？`
+                            `第二次运行了，为什么还不更新cookie？少抽一天哈`
                         );
                         log.info('main', `第二次失败通知发送完成`);
                     } catch (error) {
