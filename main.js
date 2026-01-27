@@ -11,6 +11,7 @@ const {
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const request = require('https');
 const { sendNotify } = require('./lib/helper/notify');
+const env = require('./lib/data/env');
 const metainfo = [
     '  _           _   _                   _____           _       _   ',
     ' | |         | | | |                 / ____|         (_)     | |  ',
@@ -72,6 +73,19 @@ async function main() {
             if (process.env.ARTICLE_FAILED === 'true') {
                 failedAccounts.push(acco);
                 log.info('main', `账号${acco.NUMBER}读取专栏失败，将在第一轮运行完后重新运行`);
+                
+                // 第一次读取专栏失败时发送通知
+                const accountName = acco.NOTE || `账号${acco.NUMBER}`;
+                log.info('main', `准备发送第一次失败通知`);
+                try {
+                    await sendNotify(
+                        `${accountName}读取不到专栏`,
+                        `请立即更新cookie`
+                    );
+                    log.info('main', `第一次失败通知发送完成`);
+                } catch (error) {
+                    log.error('main', `第一次失败通知发送失败: ${error.message}`);
+                }
             }
             
             if (err_msg) {
@@ -92,11 +106,28 @@ async function main() {
             await delay(15 * 60 * 1000);
             
             for (const acco of failedAccounts) {
-                process.env.COOKIE = acco.COOKIE;
-                process.env.NUMBER = acco.NUMBER;
-                process.env.CLEAR = acco.CLEAR;
-                process.env.NOTE = acco.NOTE;
-                process.env.ACCOUNT_UA = acco.ACCOUNT_UA;
+                // 重新从env.js中获取最新的账号信息
+                const latestAccounts = env.get_multiple_account();
+                const latestAccount = latestAccounts.find(acc => acc.NUMBER === acco.NUMBER);
+                
+                if (latestAccount) {
+                    // 使用最新的账号信息
+                    process.env.COOKIE = latestAccount.COOKIE;
+                    process.env.NUMBER = latestAccount.NUMBER;
+                    process.env.CLEAR = latestAccount.CLEAR;
+                    process.env.NOTE = latestAccount.NOTE;
+                    process.env.ACCOUNT_UA = latestAccount.ACCOUNT_UA;
+                    log.info('main', `已更新账号${acco.NUMBER}的cookie信息`);
+                } else {
+                    // 如果找不到最新信息，使用原来的
+                    process.env.COOKIE = acco.COOKIE;
+                    process.env.NUMBER = acco.NUMBER;
+                    process.env.CLEAR = acco.CLEAR;
+                    process.env.NOTE = acco.NOTE;
+                    process.env.ACCOUNT_UA = acco.ACCOUNT_UA;
+                    log.warn('main', `未找到账号${acco.NUMBER}的最新信息，使用原cookie`);
+                }
+                
                 process.env.ARTICLE_FAILED = 'false';
                 
                 if (acco.PROXY_HOST) {
@@ -121,15 +152,15 @@ async function main() {
                     const accountName = acco.NOTE || `账号${acco.NUMBER}`;
                     log.warn('main', `${accountName}重新运行后仍然读取专栏失败`);
                     
-                    log.info('main', `准备发送通知`);
+                    log.info('main', `准备发送第二次失败通知`);
                     try {
                         await sendNotify(
                             `${accountName}读取不到专栏`,
-                            `请更新cookie，否则无法抽奖`
+                            `第二次运行了，为什么还不更新cookie？`
                         );
-                        log.info('main', `通知发送完成`);
+                        log.info('main', `第二次失败通知发送完成`);
                     } catch (error) {
-                        log.error('main', `通知发送失败: ${error.message}`);
+                        log.error('main', `第二次失败通知发送失败: ${error.message}`);
                         log.error('main', `错误堆栈: ${error.stack}`);
                     }
                 } else {
