@@ -89,7 +89,7 @@ async function main() {
         if (failedAccounts.length > 0) {
             log.info('main', `第一轮运行完成，开始重新运行失败的账号(${failedAccounts.length}个)`);
             log.info('main', `等待15分钟后重新运行失败账号...`);
-            await delay(1 * 60 * 1000);
+            await delay(15 * 60 * 1000);
             
             for (const acco of failedAccounts) {
                 process.env.COOKIE = acco.COOKIE;
@@ -120,13 +120,12 @@ async function main() {
                     log.info('main', `进入通知发送逻辑`);
                     const accountName = acco.NOTE || `账号${acco.NUMBER}`;
                     log.warn('main', `${accountName}重新运行后仍然读取专栏失败`);
-                    let message = `${accountName}重新运行后仍然读取专栏失败`;
-                    message += `\n请更新cookie`;
-                    log.info('main', `准备发送通知: ${message}`);
+                    
+                    log.info('main', `准备发送通知`);
                     try {
                         await sendNotify(
-                            `专栏读取失败`,
-                            message
+                            `${accountName}读取不到专栏`,
+                            `请更新cookie，否则无法抽奖`
                         );
                         log.info('main', `通知发送完成`);
                     } catch (error) {
