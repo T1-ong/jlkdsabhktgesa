@@ -80,7 +80,7 @@ async function main() {
                 try {
                     await sendNotify(
                         `${accountName}读取不到专栏`,
-                        `请立即更新cookie`
+                        `给你15分钟时间，立即更新cookie`
                     );
                     log.info('main', `第一次失败通知发送完成`);
                 } catch (error) {
