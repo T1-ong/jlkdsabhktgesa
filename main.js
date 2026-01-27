@@ -75,7 +75,9 @@ async function main() {
                 log.info('main', `账号${acco.NUMBER}读取专栏失败，将在第一轮运行完后重新运行`);
                 
                 // 第一次读取专栏失败时发送通知
-                const accountName = acco.NOTE || `账号${acco.NUMBER}`;
+                let accountName = acco.NOTE || `账号${acco.NUMBER}`;
+                // 移除账号名称中的qq信息
+                accountName = accountName.replace(/，qq=\d+/g, '').replace(/,qq=\d+/g, '');
                 log.info('main', `准备发送第一次失败通知`);
                 try {
                     await sendNotify(
@@ -149,7 +151,9 @@ async function main() {
                 log.info('main', `检查ARTICLE_FAILED状态: ${process.env.ARTICLE_FAILED}`);
                 if (process.env.ARTICLE_FAILED === 'true') {
                     log.info('main', `进入通知发送逻辑`);
-                    const accountName = acco.NOTE || `账号${acco.NUMBER}`;
+                    let accountName = acco.NOTE || `账号${acco.NUMBER}`;
+                    // 移除账号名称中的qq信息
+                    accountName = accountName.replace(/，qq=\d+/g, '').replace(/,qq=\d+/g, '');
                     log.warn('main', `${accountName}重新运行后仍然读取专栏失败`);
                     
                     log.info('main', `准备发送第二次失败通知`);
