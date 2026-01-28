@@ -1,3 +1,6 @@
+// 添加模块解析路径，确保所有文件都能正确找到utils模块
+module.paths.push('./lib');
+
 const {
     version: ve,
     env_file,
