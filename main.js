@@ -31,6 +31,8 @@ let loop_wait = 0;
 /**账号状态标记 1正常 -1失效 */
 // eslint-disable-next-line no-unused-vars
 let ck_flag = 0;
+/**程序开始运行时的小时，用于确定所有账号使用相同的逻辑 */
+let startRunHour = new Date().getHours();
 
 /**
  * @returns {Promise<string>} 错误信息
@@ -54,6 +56,8 @@ async function main() {
             process.env.NOTE = acco.NOTE;
             process.env.ACCOUNT_UA = acco.ACCOUNT_UA;
             process.env.ARTICLE_FAILED = 'false';
+            // 传递程序开始运行时的小时，确保所有账号使用相同的逻辑
+            process.env.START_RUN_HOUR = startRunHour.toString();
             
             if (acco.PROXY_HOST) {
                 printIpInfo(true);
@@ -131,6 +135,8 @@ async function main() {
                 }
                 
                 process.env.ARTICLE_FAILED = 'false';
+                // 传递程序开始运行时的小时，确保所有账号使用相同的逻辑
+                process.env.START_RUN_HOUR = startRunHour.toString();
                 
                 if (acco.PROXY_HOST) {
                     printIpInfo(true);
@@ -317,6 +323,8 @@ function initConfig() {
     let keywords = [];
     let articleCreateTime = null;
     let updateKeywords = false;
+    // 使用程序开始运行时的时间，而不是当前小时，确保所有账号使用相同的逻辑
+    const runHour = startRunHour;
     
     // 读取配置文件获取原始的article_create_time值
     let originalArticleCreateTime = null;
@@ -326,15 +334,16 @@ function initConfig() {
         originalArticleCreateTime = parseInt(articleTimeMatch[1]);
     }
     
-    if (hour < 12) {
-        // 中午12点前：使用"抽奖合集史上最好"，只检查昨天一天的专栏
+    // 根据程序开始运行时的时间段决定关键词和检查天数，而不是当前小时
+    if (runHour < 12) {
+        // 12点前运行：使用"抽奖合集史上最好"，只检查昨天一天的专栏
         keywords = ['抽奖合集史上最好'];
         articleCreateTime = 1;
-        log.info('关键词更新', '已设置中午12点前关键词：抽奖合集史上最好');
+        log.info('关键词更新', `已设置中午12点前关键词：抽奖合集史上最好（程序开始时间：${startRunHour}点）`);
         log.info('专栏时间', '已设置专栏检查天数：1天（仅昨天）');
         updateKeywords = true;
     } else {
-        // 中午12点后：使用默认关键词，恢复配置文件的article_create_time
+        // 12点后运行：使用默认关键词，恢复配置文件的article_create_time
         keywords = ['临期速看', '精选大奖版'];
         articleCreateTime = originalArticleCreateTime;
         log.info('关键词更新', '已设置中午12点后关键词：临期速看, 精选大奖版');
