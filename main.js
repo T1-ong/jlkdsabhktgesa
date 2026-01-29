@@ -327,7 +327,7 @@ function initConfig() {
     let articleCreateTime = null;
     let updateKeywords = false;
     // 使用程序开始运行时的时间，而不是当前小时，确保所有账号使用相同的逻辑
-    const runHour = startRunHour;
+    const runHour = process.env.START_RUN_HOUR ? parseInt(process.env.START_RUN_HOUR) : startRunHour;
     
     // 读取配置文件获取原始的article_create_time值
     let originalArticleCreateTime = null;
