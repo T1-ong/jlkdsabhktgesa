@@ -6,6 +6,7 @@
   "scripts": {
     "login": "node main.js login",
     "start": "node main.js start",
+    "sixin": "node main.js sixin",
     "test": "node test/index.js",
     "clear": "node main.js clear",
     "check": "node main.js check",
