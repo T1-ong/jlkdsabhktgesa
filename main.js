@@ -315,6 +315,44 @@ function initConfig() {
 
     if (initEnv() || initConfig()) return;
 
+    // 处理私信回复
+    const bili_client = require('./lib/net/bili');
+    const { sendMsg } = bili_client;
+    
+    // 处理私信回复
+    async function handlePrivateMessage() {
+        // 只检查小写的环境变量
+        const sixin = process.env.sixin;
+        if (sixin) {
+            const parts = sixin.split('#');
+            if (parts.length >= 2) {
+                const uid = parts[0];
+                let content = parts[1];
+                let imageUrl = parts.length > 2 ? parts[2] : null;
+                
+                if (uid && content) {
+                    const success = await sendMsg(uid, content, imageUrl);
+                    if (success) {
+                        log.info('发送私信', `成功发送私信给 ${uid}: ${content} ${imageUrl ? `(含图片)` : ''}`);
+                    } else {
+                        log.error('发送私信', `发送私信失败: ${uid}: ${content} ${imageUrl ? `(含图片)` : ''}`);
+                    }
+                }
+            }
+        }
+    }
+    
+    // 检查是否为私信回复命令
+    if (process.argv[2] === 'sixin') {
+        // 只执行私信回复功能
+        await handlePrivateMessage();
+        log.info('私信回复', '私信回复任务已完成');
+        return;
+    }
+    
+    // 只有当执行私信回复命令时才执行私信回复功能
+    // 移除默认执行的私信回复功能，确保只有sixin.sh脚本才能触发私信回复功能
+
     // 根据时间自动更新关键词
     const fs = require('fs');
     const path = require('path');
@@ -337,7 +375,7 @@ function initConfig() {
         originalArticleCreateTime = parseInt(articleTimeMatch[1]);
     }
     
-    // 根据程序开始运行时的时间段决定关键词和检查天数，而不是当前小时
+    // 根据程序开始运行时的时间段决定关键词和检查天数
     if (runHour < 12) {
         // 12点前运行：使用"抽奖合集史上最好"，只检查昨天一天的专栏
         keywords = ['抽奖合集史上最好'];
@@ -346,11 +384,11 @@ function initConfig() {
         log.info('专栏时间', '已设置专栏检查天数：1天（仅昨天）');
         updateKeywords = true;
     } else {
-        // 12点后运行：使用默认关键词，恢复配置文件的article_create_time
+        // 12点后运行：使用默认关键词，检查3天的专栏
         keywords = ['临期速看', '精选大奖版'];
-        articleCreateTime = originalArticleCreateTime;
+        articleCreateTime = 3;
         log.info('关键词更新', '已设置中午12点后关键词：临期速看, 精选大奖版');
-        log.info('专栏时间', `已恢复配置文件的专栏检查天数：${originalArticleCreateTime}天`);
+        log.info('专栏时间', '已设置专栏检查天数：3天');
         updateKeywords = true;
     }
     
