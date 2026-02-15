@@ -1,6 +1,3 @@
-// 添加模块解析路径，确保所有文件都能正确找到utils模块
-module.paths.push('./lib');
-
 const {
     version: ve,
     env_file,
@@ -13,8 +10,6 @@ const {
 } = require('./lib/utils');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const request = require('https');
-const { sendNotify } = require('./lib/helper/notify');
-const env = require('./lib/data/env');
 const metainfo = [
     '  _           _   _                   _____           _       _   ',
     ' | |         | | | |                 / ____|         (_)     | |  ',
@@ -34,8 +29,6 @@ let loop_wait = 0;
 /**账号状态标记 1正常 -1失效 */
 // eslint-disable-next-line no-unused-vars
 let ck_flag = 0;
-/**程序开始运行时的小时，用于确定所有账号使用相同的逻辑 */
-let startRunHour = new Date().getHours();
 
 /**
  * @returns {Promise<string>} 错误信息
@@ -49,8 +42,13 @@ async function main() {
 
         process.env.ENABLE_MULTIPLE_ACCOUNT = '';
         let localhost = request.globalAgent;
-
-        let failedAccounts = [];
+        
+        // 如果是pinglun模式，第一个账号启动前添加90分钟内随机延迟
+        if (hasEnv('pinglun') && muti_acco.length > 0) {
+            const firstAccountDelay = Math.floor(Math.random() * 90 * 60 * 1000); // 90分钟内随机延迟
+            log.info('多账号延迟', `pinglun模式，第一个账号延迟${Math.floor(firstAccountDelay / 1000 / 60)}分${Math.floor((firstAccountDelay / 1000) % 60)}秒后启动`);
+            await delay(firstAccountDelay);
+        }
 
         for (const acco of muti_acco) {
             process.env.COOKIE = acco.COOKIE;
@@ -58,10 +56,6 @@ async function main() {
             process.env.CLEAR = acco.CLEAR;
             process.env.NOTE = acco.NOTE;
             process.env.ACCOUNT_UA = acco.ACCOUNT_UA;
-            process.env.ARTICLE_FAILED = 'false';
-            // 传递程序开始运行时的小时，确保所有账号使用相同的逻辑
-            process.env.START_RUN_HOUR = startRunHour.toString();
-            
             if (acco.PROXY_HOST) {
                 printIpInfo(true);
                 //http://ip:port
@@ -76,123 +70,24 @@ async function main() {
                 request.globalAgent = localhost;
             }
             const err_msg = await main();
-            
-            if (process.env.ARTICLE_FAILED === 'true') {
-                failedAccounts.push(acco);
-                log.info('main', `账号${acco.NUMBER}读取专栏失败，将在第一轮运行完后重新运行`);
-                
-                // 第一次读取专栏失败时发送通知
-                let accountName = acco.NOTE || `账号${acco.NUMBER}`;
-                // 移除账号名称中的qq信息
-                accountName = accountName.replace(/，qq=\d+/g, '').replace(/,qq=\d+/g, '');
-                log.info('main', `准备发送第一次失败通知`);
-                try {
-                    await sendNotify(
-                        `${accountName}读取不到专栏`,
-                        `给你15分钟时间，立即更新cookie`
-                    );
-                    log.info('main', `第一次失败通知发送完成`);
-                } catch (error) {
-                    log.error('main', `第一次失败通知发送失败: ${error.message}`);
-                }
-            }
-            
             if (err_msg) {
                 return err_msg;
             } else {
                 if (ck_flag === 1) {
-                    await delay(acco.WAIT);
+                    // 如果是pinglun模式，使用90分钟内随机延迟，否则使用配置的延迟
+                    if (hasEnv('pinglun')) {
+                        const randomDelay = Math.floor(Math.random() * 90 * 60 * 1000); // 90分钟内随机延迟
+                        log.info('多账号延迟', `pinglun模式，账号间延迟${Math.floor(randomDelay / 1000 / 60)}分${Math.floor((randomDelay / 1000) % 60)}秒`);
+                        await delay(randomDelay);
+                    } else {
+                        await delay(acco.WAIT);
+                    }
                 } else {
                     await delay(3 * 1000);
                 }
             }
             request.globalAgent = localhost;
         }
-
-        if (failedAccounts.length > 0) {
-            log.info('main', `第一轮运行完成，开始重新运行失败的账号(${failedAccounts.length}个)`);
-            log.info('main', `等待15分钟后重新运行失败账号...`);
-            await delay(15 * 60 * 1000);
-            
-            for (const acco of failedAccounts) {
-                // 重新从env.js中获取最新的账号信息
-                const latestAccounts = env.get_multiple_account();
-                const latestAccount = latestAccounts.find(acc => acc.NUMBER === acco.NUMBER);
-                
-                if (latestAccount) {
-                    // 使用最新的账号信息
-                    process.env.COOKIE = latestAccount.COOKIE;
-                    process.env.NUMBER = latestAccount.NUMBER;
-                    process.env.CLEAR = latestAccount.CLEAR;
-                    process.env.NOTE = latestAccount.NOTE;
-                    process.env.ACCOUNT_UA = latestAccount.ACCOUNT_UA;
-                    log.info('main', `已更新账号${acco.NUMBER}的cookie信息`);
-                } else {
-                    // 如果找不到最新信息，使用原来的
-                    process.env.COOKIE = acco.COOKIE;
-                    process.env.NUMBER = acco.NUMBER;
-                    process.env.CLEAR = acco.CLEAR;
-                    process.env.NOTE = acco.NOTE;
-                    process.env.ACCOUNT_UA = acco.ACCOUNT_UA;
-                    log.warn('main', `未找到账号${acco.NUMBER}的最新信息，使用原cookie`);
-                }
-                
-                process.env.ARTICLE_FAILED = 'false';
-                // 传递程序开始运行时的小时，确保所有账号使用相同的逻辑
-                process.env.START_RUN_HOUR = startRunHour.toString();
-                
-                if (acco.PROXY_HOST) {
-                    printIpInfo(true);
-                    const proxyUrl = acco.PROXY_USER
-                        ? 'http://' + acco.PROXY_USER + ':' + acco.PROXY_PASS + '@' + acco.PROXY_HOST + ':' + acco.PROXY_PORT
-                        : 'http://' + acco.PROXY_HOST + ':' + acco.PROXY_PORT;
-                    request.globalAgent = new HttpsProxyAgent(proxyUrl);
-                    printIpInfo(false);
-                }else {
-                    request.globalAgent = localhost;
-                }
-                
-                log.info('main', `重新运行账号${acco.NUMBER}`);
-                log.info('main', `重新运行前ARTICLE_FAILED状态: ${process.env.ARTICLE_FAILED}`);
-                const err_msg = await main();
-                log.info('main', `重新运行后ARTICLE_FAILED状态: ${process.env.ARTICLE_FAILED}`);
-                
-                log.info('main', `检查ARTICLE_FAILED状态: ${process.env.ARTICLE_FAILED}`);
-                if (process.env.ARTICLE_FAILED === 'true') {
-                    log.info('main', `进入通知发送逻辑`);
-                    let accountName = acco.NOTE || `账号${acco.NUMBER}`;
-                    // 移除账号名称中的qq信息
-                    accountName = accountName.replace(/，qq=\d+/g, '').replace(/,qq=\d+/g, '');
-                    log.warn('main', `${accountName}重新运行后仍然读取专栏失败`);
-                    
-                    log.info('main', `准备发送第二次失败通知`);
-                    try {
-                        await sendNotify(
-                            `${accountName}读取不到专栏`,
-                            `第二次运行了，为什么还不更新cookie？少抽一天哈`
-                        );
-                        log.info('main', `第二次失败通知发送完成`);
-                    } catch (error) {
-                        log.error('main', `第二次失败通知发送失败: ${error.message}`);
-                        log.error('main', `错误堆栈: ${error.stack}`);
-                    }
-                } else {
-                    log.info('main', `账号${acco.NUMBER}重新运行成功，无需发送通知`);
-                }
-                
-                if (err_msg) {
-                    return err_msg;
-                } else {
-                    if (ck_flag === 1) {
-                        await delay(acco.WAIT);
-                    } else {
-                        await delay(3 * 1000);
-                    }
-                }
-                request.globalAgent = localhost;
-            }
-        }
-        
         /**多账号状态还原 */
         process.env.ENABLE_MULTIPLE_ACCOUNT = ENABLE_MULTIPLE_ACCOUNT;
     } else if (COOKIE) {
@@ -315,44 +210,6 @@ function initConfig() {
 
     if (initEnv() || initConfig()) return;
 
-    // 处理私信回复
-    const bili_client = require('./lib/net/bili');
-    const { sendMsg } = bili_client;
-    
-    // 处理私信回复
-    async function handlePrivateMessage() {
-        // 只检查小写的环境变量
-        const sixin = process.env.sixin;
-        if (sixin) {
-            const parts = sixin.split('#');
-            if (parts.length >= 2) {
-                const uid = parts[0];
-                let content = parts[1];
-                let imageUrl = parts.length > 2 ? parts[2] : null;
-                
-                if (uid && content) {
-                    const success = await sendMsg(uid, content, imageUrl);
-                    if (success) {
-                        log.info('发送私信', `成功发送私信给 ${uid}: ${content} ${imageUrl ? `(含图片)` : ''}`);
-                    } else {
-                        log.error('发送私信', `发送私信失败: ${uid}: ${content} ${imageUrl ? `(含图片)` : ''}`);
-                    }
-                }
-            }
-        }
-    }
-    
-    // 检查是否为私信回复命令
-    if (process.argv[2] === 'sixin') {
-        // 只执行私信回复功能
-        await handlePrivateMessage();
-        log.info('私信回复', '私信回复任务已完成');
-        return;
-    }
-    
-    // 只有当执行私信回复命令时才执行私信回复功能
-    // 移除默认执行的私信回复功能，确保只有sixin.sh脚本才能触发私信回复功能
-
     // 根据时间自动更新关键词
     const fs = require('fs');
     const path = require('path');
@@ -364,8 +221,6 @@ function initConfig() {
     let keywords = [];
     let articleCreateTime = null;
     let updateKeywords = false;
-    // 使用程序开始运行时的时间，而不是当前小时，确保所有账号使用相同的逻辑
-    const runHour = process.env.START_RUN_HOUR ? parseInt(process.env.START_RUN_HOUR) : startRunHour;
     
     // 读取配置文件获取原始的article_create_time值
     let originalArticleCreateTime = null;
@@ -375,20 +230,19 @@ function initConfig() {
         originalArticleCreateTime = parseInt(articleTimeMatch[1]);
     }
     
-    // 根据程序开始运行时的时间段决定关键词和检查天数
-    if (runHour < 12) {
-        // 12点前运行：使用"抽奖合集史上最好"，只检查昨天一天的专栏
+    if (hour < 12) {
+        // 中午12点前：使用"抽奖合集史上最好"，只检查昨天一天的专栏
         keywords = ['抽奖合集史上最好'];
         articleCreateTime = 1;
-        log.info('关键词更新', `已设置中午12点前关键词：抽奖合集史上最好（程序开始时间：${startRunHour}点）`);
+        log.info('关键词更新', '已设置中午12点前关键词：抽奖合集史上最好');
         log.info('专栏时间', '已设置专栏检查天数：1天（仅昨天）');
         updateKeywords = true;
     } else {
-        // 12点后运行：使用默认关键词，检查3天的专栏
+        // 中午12点后：使用默认关键词，恢复配置文件的article_create_time
         keywords = ['临期速看', '精选大奖版'];
-        articleCreateTime = 3;
+        articleCreateTime = originalArticleCreateTime;
         log.info('关键词更新', '已设置中午12点后关键词：临期速看, 精选大奖版');
-        log.info('专栏时间', '已设置专栏检查天数：3天');
+        log.info('专栏时间', `已恢复配置文件的专栏检查天数：${originalArticleCreateTime}天`);
         updateKeywords = true;
     }
     
